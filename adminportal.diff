@@ -1,12 +1,13 @@
 diff --git a/src/java/controller/AdminServlet.java b/src/java/controller/AdminServlet.java
 new file mode 100644
-index 0000000..26689d8
+index 0000000..efeaf06
 --- /dev/null
 +++ b/src/java/controller/AdminServlet.java
-@@ -0,0 +1,126 @@
+@@ -0,0 +1,142 @@
 +package controller;
 +
 +import entity.Food;
++import entity.Subscription;
 +import entity.SurplusFood;
 +import entity.User;
 +import java.io.IOException;
@@ -19,9 +20,11 @@ index 0000000..26689d8
 +import javax.servlet.http.HttpServletRequest;
 +import javax.servlet.http.HttpServletResponse;
 +import service.FoodService;
++import service.SubscriptionService;
 +import service.SurplusFoodService;
 +import service.UserService;
 +import service.impl.FoodServiceImpl;
++import service.impl.SubscriptionServiceImpl;
 +import service.impl.SurplusFoodServiceImpl;
 +import service.impl.UserServiceImpl;
 +
@@ -129,12 +132,56 @@ index 0000000..26689d8
 +        RequestDispatcher dispatcher = request.getRequestDispatcher("/views/admin/surplusfoods.jsp");
 +        dispatcher.forward(request, response);
 +    }
++    
++    private void getSubscriptions(HttpServletRequest request, HttpServletResponse response)
++            throws ServletException, IOException {
++        SubscriptionService subscriptionFoodService = new SubscriptionServiceImpl();
++        List<Subscription> subscriptions = null;
++
++        subscriptions = subscriptionFoodService.getAllSubscriptions();
++
++        request.setAttribute("subscriptions", subscriptions);
++
++        RequestDispatcher dispatcher = request.getRequestDispatcher("/views/admin/subscriptions.jsp");
++        dispatcher.forward(request, response);
++    }
 +}
+diff --git a/src/java/controller/SubscribeServlet.java b/src/java/controller/SubscribeServlet.java
+index aae65de..e72ebbd 100644
+--- a/src/java/controller/SubscribeServlet.java
++++ b/src/java/controller/SubscribeServlet.java
+@@ -58,7 +58,7 @@ protected void doPost(HttpServletRequest request, HttpServletResponse response)
+         }
+ 
+         Subscription subscription = new Subscription();
+-        subscription.setUser(user);
++        subscription.setUserID(user.getId());
+         subscription.setPreferenceType(PreferenceType.valueOf(preferenceType));
+         subscription.setContactType(ContactType.valueOf(contactType));
+         subscription.setRetailerUsername(retailerUsername);
+diff --git a/src/java/dao/SubscriptionDao.java b/src/java/dao/SubscriptionDao.java
+index c50b77c..dc5f3fc 100644
+--- a/src/java/dao/SubscriptionDao.java
++++ b/src/java/dao/SubscriptionDao.java
+@@ -9,5 +9,5 @@ public interface SubscriptionDao {
+     void deleteSubscription(int subscriptionId);
+     List<Subscription> getSubscriptionsByPreference(FoodType foodType); 
+     List<Subscription> findSubscriptionsByUserAndPreference(int userId, String preferenceType, String retailerUsername);
+-
++    List<Subscription> getAllSubscription();
+ }
 diff --git a/src/java/dao/impl/SubscriptionDaoImpl.java b/src/java/dao/impl/SubscriptionDaoImpl.java
-index 6cf4ecb..da808bc 100644
+index 6cf4ecb..7d3a076 100644
 --- a/src/java/dao/impl/SubscriptionDaoImpl.java
 +++ b/src/java/dao/impl/SubscriptionDaoImpl.java
-@@ -11,28 +11,25 @@ import util.FoodType;
+@@ -6,33 +6,32 @@ import util.DBConnection;
+ import java.sql.*;
+ import java.util.ArrayList;
+ import java.util.List;
++import util.ContactType;
+ import util.FoodType;
++import util.PreferenceType;
+ 
  public class SubscriptionDaoImpl implements SubscriptionDao {
  
      @Override
@@ -154,7 +201,7 @@ index 6cf4ecb..da808bc 100644
 +    public void addSubscription(Subscription subscription) {
 +        String sql = "INSERT INTO SUBSCRIPTION (USER_ID, CONTACT_TYPE, PREFERENCE_TYPE, RETAILER_USERNAME) VALUES (?, ?, ?, ?)";
 +        try (Connection conn = DBConnection.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
-+            stmt.setInt(1, subscription.getUser().getId());
++            stmt.setInt(1, subscription.getUserID());
 +            stmt.setString(2, subscription.getContactType().toString());
 +            stmt.setString(3, subscription.getPreferenceType().toString());
 +            stmt.setString(4, subscription.getRetailerUsername());
@@ -177,7 +224,7 @@ index 6cf4ecb..da808bc 100644
              stmt.setInt(1, subscriptionId);
              stmt.executeUpdate();
          } catch (SQLException e) {
-@@ -44,8 +41,7 @@ public void addSubscription(Subscription subscription) {
+@@ -44,8 +43,7 @@ public void addSubscription(Subscription subscription) {
      public List<Subscription> findSubscriptionsByUserAndPreference(int userId, String preferenceType, String retailerUsername) {
          List<Subscription> subscriptions = new ArrayList<>();
          String sql = "SELECT * FROM Subscription WHERE user_id = ? AND preference_type = ? AND retailer_username = ?";
@@ -187,7 +234,7 @@ index 6cf4ecb..da808bc 100644
              stmt.setInt(1, userId);
              stmt.setString(2, preferenceType);
              stmt.setString(3, retailerUsername);
-@@ -64,14 +60,12 @@ public void addSubscription(Subscription subscription) {
+@@ -64,15 +62,35 @@ public void addSubscription(Subscription subscription) {
      public List<Subscription> getSubscriptionsByPreference(FoodType foodType) {
          List<Subscription> subscriptions = new ArrayList<>();
          String sql = "SELECT * FROM SUBSCRIPTION WHERE PREFERENCE_TYPE = ?";
@@ -201,9 +248,32 @@ index 6cf4ecb..da808bc 100644
 -                   
 -                    
 +
++                    subscription.setId(rs.getInt("ID"));
++                    subscriptions.add(subscription);
++                }
++            }
++        } catch (SQLException e) {
++            System.out.println("Error getting subscriptions by preference: " + e.getMessage());
++        }
++        return subscriptions;
++    }
++
++    @Override
++    public List<Subscription> getAllSubscription() {
++        List<Subscription> subscriptions = new ArrayList<>();
++        String sql = "SELECT * FROM SUBSCRIPTION ORDER BY ID";
++        try (Connection conn = DBConnection.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
++            try (ResultSet rs = stmt.executeQuery()) {
++                while (rs.next()) {
++                    Subscription subscription = new Subscription();
                      subscription.setId(rs.getInt("ID"));
++                    subscription.setUserID(rs.getInt("USER_ID"));
++                    subscription.setContactType(ContactType.valueOf(rs.getString("CONTACT_TYPE")));
++                    subscription.setPreferenceType(PreferenceType.valueOf(rs.getString("PREFERENCE_TYPE")));
++                    subscription.setRetailerUsername(rs.getString("RETAILER_USERNAME"));
                      subscriptions.add(subscription);
                  }
+             }
 diff --git a/src/java/dao/impl/UserDaoImpl.java b/src/java/dao/impl/UserDaoImpl.java
 index 29d0332..8b8ab14 100644
 --- a/src/java/dao/impl/UserDaoImpl.java
@@ -331,6 +401,77 @@ index 29d0332..8b8ab14 100644
  
 -    
  }
+diff --git a/src/java/entity/Subscription.java b/src/java/entity/Subscription.java
+index 763e388..17ede9c 100644
+--- a/src/java/entity/Subscription.java
++++ b/src/java/entity/Subscription.java
+@@ -6,7 +6,7 @@ import util.PreferenceType;
+ public class Subscription {
+ 
+     private int id;
+-    private User user;
++    private int userID;
+     private ContactType contactType;
+     private PreferenceType preferenceType;
+     private String retailerUsername;
+@@ -14,42 +14,50 @@ public class Subscription {
+     public Subscription() {
+     }
+ 
+-    public Subscription(int id, User user, ContactType contactType, PreferenceType preferenceType, String retailerUsername) {
++    public Subscription(int id, int userID, ContactType contactType, PreferenceType preferenceType, String retailerUsername) {
+         this.id = id;
+-        this.user = user;
++        this.userID = userID;
+         this.contactType = contactType;
+         this.preferenceType = preferenceType;
+         this.retailerUsername = retailerUsername;
+     }
+ 
+-     public User getUser() {
+-        return user;
++    public int getUserID() {
++        return userID;
+     }
+ 
+-    public void setUser(User user) {
+-        this.user = user;
++    public void setUserID(int userID) {
++        this.userID = userID;
+     }
++
+     public int getId() {
+         return id;
+     }
++
+     public void setId(int id) {
+         this.id = id;
+     }
++
+     public ContactType getContactType() {
+         return contactType;
+     }
++
+     public void setContactType(ContactType contactType) {
+         this.contactType = contactType;
+     }
++
+     public PreferenceType getPreferenceType() {
+         return preferenceType;
+     }
++
+     public void setPreferenceType(PreferenceType preferenceType) {
+         this.preferenceType = preferenceType;
+     }
++
+     public String getRetailerUsername() {
+-    return retailerUsername;
++        return retailerUsername;
+     }
++
+     public void setRetailerUsername(String retailerUsername) {
+         this.retailerUsername = retailerUsername;
+     }
 diff --git a/src/java/service/FoodService.java b/src/java/service/FoodService.java
 index 67b5be2..a464a00 100644
 --- a/src/java/service/FoodService.java
@@ -342,6 +483,22 @@ index 67b5be2..a464a00 100644
 +    
 +    List<Food> getAllFoods();
  }
+diff --git a/src/java/service/SubscriptionService.java b/src/java/service/SubscriptionService.java
+index f3a94af..44bba1e 100644
+--- a/src/java/service/SubscriptionService.java
++++ b/src/java/service/SubscriptionService.java
+@@ -1,9 +1,11 @@
+ package service;
+ import entity.Subscription;
++import java.util.List;
+ import util.SubscriptionResult;
+ 
+ public interface SubscriptionService {
+     SubscriptionResult subscribe(Subscription subscription);
+     void unsubscribe(int subscriptionId);
++    List<Subscription> getAllSubscriptions();
+ }
+ 
 diff --git a/src/java/service/impl/FoodServiceImpl.java b/src/java/service/impl/FoodServiceImpl.java
 index f26ef12..3097b51 100644
 --- a/src/java/service/impl/FoodServiceImpl.java
@@ -368,6 +525,107 @@ index f26ef12..3097b51 100644
 +    }
 +
  }
+diff --git a/src/java/service/impl/SubscriptionServiceImpl.java b/src/java/service/impl/SubscriptionServiceImpl.java
+index 99a8b4e..0c1816e 100644
+--- a/src/java/service/impl/SubscriptionServiceImpl.java
++++ b/src/java/service/impl/SubscriptionServiceImpl.java
+@@ -23,13 +23,13 @@ public class SubscriptionServiceImpl implements SubscriptionService {
+     @Override
+     public SubscriptionResult subscribe(Subscription subscription) {
+         List<Subscription> existingSubscriptions = subscriptionDao.findSubscriptionsByUserAndPreference(
+-                subscription.getUser().getId(), subscription.getPreferenceType().toString(), subscription.getRetailerUsername());
++                subscription.getUserID(), subscription.getPreferenceType().toString(), subscription.getRetailerUsername());
+ 
+         if (!existingSubscriptions.isEmpty()) {
+             return SubscriptionResult.ALREADY_SUBSCRIBED;
+         } else {
+             subscriptionDao.addSubscription(subscription);
+-            userDao.updateUserIsSubscribed(subscription.getUser().getId(), true);
++            userDao.updateUserIsSubscribed(subscription.getUserID(), true);
+             return SubscriptionResult.SUCCESS;
+         }
+     }
+@@ -38,4 +38,11 @@ public class SubscriptionServiceImpl implements SubscriptionService {
+     public void unsubscribe(int subscriptionId) {
+         subscriptionDao.deleteSubscription(subscriptionId);
+     }
++
++    @Override
++    public List<Subscription> getAllSubscriptions() {
++        return subscriptionDao.getAllSubscription();
++    }
++    
++    
+ }
+\ No newline at end of file
+diff --git a/src/java/service/impl/SurplusFoodServiceImpl.java b/src/java/service/impl/SurplusFoodServiceImpl.java
+index 35b5435..7c00a46 100644
+--- a/src/java/service/impl/SurplusFoodServiceImpl.java
++++ b/src/java/service/impl/SurplusFoodServiceImpl.java
+@@ -2,8 +2,10 @@ package service.impl;
+ 
+ import dao.SubscriptionDao;
+ import dao.SurplusFoodDao;
++import dao.UserDao;
+ import dao.impl.SubscriptionDaoImpl;
+ import dao.impl.SurplusFoodDaoImpl;
++import dao.impl.UserDaoImpl;
+ import entity.Subscription;
+ import entity.SurplusFood;
+ import entity.User;
+@@ -17,10 +19,12 @@ public class SurplusFoodServiceImpl implements SurplusFoodService {
+     private NotificationServiceImpl notificationService = null;
+     private SubscriptionDao subscriptionDao = null;
+     private SurplusFoodDao surplusfoodDao = null;
++    private UserDao userDao = null;
+ 
+     public SurplusFoodServiceImpl() {
+         this.notificationService = new NotificationServiceImpl();
+         this.subscriptionDao = new SubscriptionDaoImpl();
++        this.userDao = new UserDaoImpl();
+         surplusfoodDao = new SurplusFoodDaoImpl();
+     }
+ 
+@@ -35,7 +39,8 @@ public class SurplusFoodServiceImpl implements SurplusFoodService {
+         List<Subscription> subscriptions = subscriptionDao.getSubscriptionsByPreference(food.getFoodType());
+ 
+         for (Subscription subscription : subscriptions) {
+-            User user = subscription.getUser();
++            int userID = subscription.getUserID();
++            User user = userDao.getUserById(userID);
+             String message = "Available surplus food: " + food.getName();
+ 
+             notificationService.sendNotification(
+diff --git a/web/WEB-INF/classes/database.properties b/web/WEB-INF/classes/database.properties
+index 1480c08..af242e7 100644
+--- a/web/WEB-INF/classes/database.properties
++++ b/web/WEB-INF/classes/database.properties
+@@ -1,3 +1,3 @@
+ jdbc.url=jdbc:mysql://localhost:3306/FWRP
+-jdbc.username=root
+-jdbc.password=MoMo0414!
++jdbc.username=CST8288
++jdbc.password=qwer1234
+diff --git a/web/WEB-INF/web.xml b/web/WEB-INF/web.xml
+index 4964072..8e19344 100644
+--- a/web/WEB-INF/web.xml
++++ b/web/WEB-INF/web.xml
+@@ -5,6 +5,15 @@
+             index.jsp
+         </welcome-file>
+     </welcome-file-list>
++    <servlet>
++        <servlet-name>adminportal</servlet-name>
++        <jsp-file>/admin.jsp</jsp-file>
++    </servlet>
++                                                                                                               
++    <servlet-mapping>
++        <servlet-name>adminportal</servlet-name>
++        <url-pattern>/admin</url-pattern>
++    </servlet-mapping>
+     <session-config>
+         <session-timeout>
+             30
 diff --git a/web/admin.jsp b/web/admin.jsp
 new file mode 100644
 index 0000000..e565631
@@ -480,19 +738,46 @@ index 0000000..61a0bd8
 \ No newline at end of file
 diff --git a/web/views/admin/subscriptions.jsp b/web/views/admin/subscriptions.jsp
 new file mode 100644
-index 0000000..5de054a
+index 0000000..d93db44
 --- /dev/null
 +++ b/web/views/admin/subscriptions.jsp
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,38 @@
++<%@page import="entity.Subscription"%>
++<%@page import="java.util.List" %>
 +<%@page contentType="text/html" pageEncoding="UTF-8"%>
 +<!DOCTYPE html>
 +<html>
 +    <head>
 +        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-+        <title>JSP Page</title>
++        <title>Surplusfood Inventory List</title>
 +    </head>
 +    <body>
-+        <h1>Hello World!</h1>
++        <h2>Surplusfood Inventory List</h2>
++
++        <table border="1">
++            <thead>
++                <tr>
++                    <th>ID</th>
++                    <th>User ID</th>
++                    <th>Contact Type</th>
++                    <th>Preference Type</th>
++                    <th>Retailer Name</th>
++                </tr>
++            </thead>
++            <tbody>
++                <% List<Subscription> subscriptions = (List<Subscription>) request.getAttribute("subscriptions");
++                    for (Subscription subscription : subscriptions) {%>
++                <tr>
++                    <td><%= subscription.getId()%></td>
++                    <td><%= subscription.getUserID()%></td>
++                    <td><%= subscription.getContactType().toString()%></td>
++                    <td><%= subscription.getPreferenceType().toString()%></td>
++                    <td><%= subscription.getRetailerUsername()%></td>
++                </tr>
++                <% }%>
++            </tbody>
++        </table>
++        <p>Back to &#128073; <a href="${pageContext.request.contextPath}/views/admin/admin_dashboard.jsp">DashBoard</a></p>
 +    </body>
 +</html>
 diff --git a/web/views/admin/surplusfoods.jsp b/web/views/admin/surplusfoods.jsp
