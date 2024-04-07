@@ -1,0 +1,606 @@
+diff --git a/src/java/controller/AdminServlet.java b/src/java/controller/AdminServlet.java
+new file mode 100644
+index 0000000..26689d8
+--- /dev/null
++++ b/src/java/controller/AdminServlet.java
+@@ -0,0 +1,126 @@
++package controller;
++
++import entity.Food;
++import entity.SurplusFood;
++import entity.User;
++import java.io.IOException;
++import java.lang.reflect.Method;
++import java.util.List;
++import javax.servlet.RequestDispatcher;
++import javax.servlet.ServletException;
++import javax.servlet.annotation.WebServlet;
++import javax.servlet.http.HttpServlet;
++import javax.servlet.http.HttpServletRequest;
++import javax.servlet.http.HttpServletResponse;
++import service.FoodService;
++import service.SurplusFoodService;
++import service.UserService;
++import service.impl.FoodServiceImpl;
++import service.impl.SurplusFoodServiceImpl;
++import service.impl.UserServiceImpl;
++
++@WebServlet(name = "AdminServlet", urlPatterns = {"/AdminServlet", "*.admindo"})
++public class AdminServlet extends HttpServlet {
++
++    // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code.">
++    /**
++     * Handles the HTTP <code>GET</code> method.
++     *
++     * @param request servlet request
++     * @param response servlet response
++     * @throws ServletException if a servlet-specific error occurs
++     * @throws IOException if an I/O error occurs
++     */
++    @Override
++    protected void doGet(HttpServletRequest request, HttpServletResponse response)
++            throws ServletException, IOException {
++        doPost(request, response);
++    }
++
++    /**
++     * Handles the HTTP <code>POST</code> method.
++     *
++     * @param request servlet request
++     * @param response servlet response
++     * @throws ServletException if a servlet-specific error occurs
++     * @throws IOException if an I/O error occurs
++     */
++    @Override
++    protected void doPost(HttpServletRequest request, HttpServletResponse response)
++            throws ServletException, IOException {
++        String url = request.getRequestURI();
++
++        String methodName = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
++        System.out.println(methodName);
++        Method method = null;
++        try {
++            method = getClass().getDeclaredMethod(methodName, HttpServletRequest.class, HttpServletResponse.class);
++            method.invoke(this, request, response);
++        } catch (Exception e) {
++            throw new RuntimeException("method error" + methodName, e);
++        }
++    }
++
++    /**
++     * Returns a short description of the servlet.
++     *
++     * @return a String containing servlet description
++     */
++    @Override
++    public String getServletInfo() {
++        return "Short description";
++    }// </editor-fold>
++
++    private void login(HttpServletRequest request, HttpServletResponse response)
++            throws ServletException, IOException {
++
++        String userName = request.getParameter("username");
++        String password = request.getParameter("password");
++
++        if (userName.equals("admin") && password.equals("qwer1234")) {
++            response.sendRedirect(request.getContextPath() + "/views/admin/admin_dashboard.jsp");
++            return;
++        }
++        request.setAttribute("errorMessage", "login failed");
++        request.getRequestDispatcher("/admin.jsp").forward(request, response);
++    }
++
++    private void getUsers(HttpServletRequest request, HttpServletResponse response)
++            throws ServletException, IOException {
++        UserService userservice = new UserServiceImpl();
++        List<User> users = null;
++
++        users = userservice.getAllUsers();
++
++        request.setAttribute("users", users);
++
++        RequestDispatcher dispatcher = request.getRequestDispatcher("/views/admin/users.jsp");
++        dispatcher.forward(request, response);
++    }
++    
++    private void getFoods(HttpServletRequest request, HttpServletResponse response)
++            throws ServletException, IOException {
++        FoodService foodservice = new FoodServiceImpl();
++        List<Food> foods = null;
++
++        foods = foodservice.getAllFoods();
++
++        request.setAttribute("foods", foods);
++
++        RequestDispatcher dispatcher = request.getRequestDispatcher("/views/admin/foods.jsp");
++        dispatcher.forward(request, response);
++    }
++    
++    private void getSurplusFoods(HttpServletRequest request, HttpServletResponse response)
++            throws ServletException, IOException {
++        SurplusFoodService surplusFoodService = new SurplusFoodServiceImpl();
++        List<SurplusFood> surplusfoods = null;
++
++        surplusfoods = surplusFoodService.getAllSurplusFood();
++
++        request.setAttribute("surplusfoods", surplusfoods);
++
++        RequestDispatcher dispatcher = request.getRequestDispatcher("/views/admin/surplusfoods.jsp");
++        dispatcher.forward(request, response);
++    }
++}
+diff --git a/src/java/dao/impl/SubscriptionDaoImpl.java b/src/java/dao/impl/SubscriptionDaoImpl.java
+index 6cf4ecb..da808bc 100644
+--- a/src/java/dao/impl/SubscriptionDaoImpl.java
++++ b/src/java/dao/impl/SubscriptionDaoImpl.java
+@@ -11,28 +11,25 @@ import util.FoodType;
+ public class SubscriptionDaoImpl implements SubscriptionDao {
+ 
+     @Override
+-public void addSubscription(Subscription subscription) {
+-    String sql = "INSERT INTO SUBSCRIPTION (USER_ID, CONTACT_TYPE, PREFERENCE_TYPE, RETAILER_USERNAME) VALUES (?, ?, ?, ?)";
+-    try (Connection conn = DBConnection.getConnection();
+-         PreparedStatement stmt = conn.prepareStatement(sql)) {
+-        stmt.setInt(1, subscription.getUser().getId());
+-        stmt.setString(2, subscription.getContactType().toString());
+-        stmt.setString(3, subscription.getPreferenceType().toString());
+-        stmt.setString(4, subscription.getRetailerUsername());
+-        int rowsAffected = stmt.executeUpdate();
+-        System.out.println("Rows affected: " + rowsAffected);
+-    } catch (SQLException e) {
+-        e.printStackTrace();
+-        System.out.println("SQLException: " + e.getMessage());
++    public void addSubscription(Subscription subscription) {
++        String sql = "INSERT INTO SUBSCRIPTION (USER_ID, CONTACT_TYPE, PREFERENCE_TYPE, RETAILER_USERNAME) VALUES (?, ?, ?, ?)";
++        try (Connection conn = DBConnection.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
++            stmt.setInt(1, subscription.getUser().getId());
++            stmt.setString(2, subscription.getContactType().toString());
++            stmt.setString(3, subscription.getPreferenceType().toString());
++            stmt.setString(4, subscription.getRetailerUsername());
++            int rowsAffected = stmt.executeUpdate();
++            System.out.println("Rows affected: " + rowsAffected);
++        } catch (SQLException e) {
++            e.printStackTrace();
++            System.out.println("SQLException: " + e.getMessage());
++        }
+     }
+-}
+-
+ 
+     @Override
+     public void deleteSubscription(int subscriptionId) {
+         String sql = "DELETE FROM SUBSCRIPTION WHERE ID = ?";
+-        try (Connection conn = DBConnection.getConnection();
+-             PreparedStatement stmt = conn.prepareStatement(sql)) {
++        try (Connection conn = DBConnection.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
+             stmt.setInt(1, subscriptionId);
+             stmt.executeUpdate();
+         } catch (SQLException e) {
+@@ -44,8 +41,7 @@ public void addSubscription(Subscription subscription) {
+     public List<Subscription> findSubscriptionsByUserAndPreference(int userId, String preferenceType, String retailerUsername) {
+         List<Subscription> subscriptions = new ArrayList<>();
+         String sql = "SELECT * FROM Subscription WHERE user_id = ? AND preference_type = ? AND retailer_username = ?";
+-        try (Connection conn = DBConnection.getConnection();
+-             PreparedStatement stmt = conn.prepareStatement(sql)) {
++        try (Connection conn = DBConnection.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
+             stmt.setInt(1, userId);
+             stmt.setString(2, preferenceType);
+             stmt.setString(3, retailerUsername);
+@@ -64,14 +60,12 @@ public void addSubscription(Subscription subscription) {
+     public List<Subscription> getSubscriptionsByPreference(FoodType foodType) {
+         List<Subscription> subscriptions = new ArrayList<>();
+         String sql = "SELECT * FROM SUBSCRIPTION WHERE PREFERENCE_TYPE = ?";
+-        try (Connection conn = DBConnection.getConnection();
+-             PreparedStatement stmt = conn.prepareStatement(sql)) {
++        try (Connection conn = DBConnection.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
+             stmt.setString(1, foodType.toString());
+             try (ResultSet rs = stmt.executeQuery()) {
+                 while (rs.next()) {
+                     Subscription subscription = new Subscription();
+-                   
+-                    
++
+                     subscription.setId(rs.getInt("ID"));
+                     subscriptions.add(subscription);
+                 }
+diff --git a/src/java/dao/impl/UserDaoImpl.java b/src/java/dao/impl/UserDaoImpl.java
+index 29d0332..8b8ab14 100644
+--- a/src/java/dao/impl/UserDaoImpl.java
++++ b/src/java/dao/impl/UserDaoImpl.java
+@@ -13,35 +13,38 @@ public class UserDaoImpl implements UserDao {
+ 
+     @Override
+     public void addUser(User user) {
+-    String sql = "INSERT INTO USERS (USER_NAME, PASSWORD, USER_TYPE, PHONE_NUMBER, EMAIL, IS_SUBSCRIBED) VALUES (?, ?, ?, ?, ?, ?)";
+-    try (Connection conn = DBConnection.getConnection();
+-         PreparedStatement stmt = conn.prepareStatement(sql)) {
+-        stmt.setString(1, user.getUserName());
+-        stmt.setString(2, user.getPassword());
+-        stmt.setString(3, user.getUserType().toString());
+-        stmt.setString(4, user.getPhoneNumber());
+-        stmt.setString(5, user.getEmail());
+-        stmt.setBoolean(6, user.isSubscribed());
+-        int affectedRows = stmt.executeUpdate();
+-        System.out.println("Affected rows: " + affectedRows);
+-    } catch (SQLException e) {
+-        e.printStackTrace();
++        String sql = "INSERT INTO USERS (USER_NAME, PASSWORD, USER_TYPE, PHONE_NUMBER, EMAIL, IS_SUBSCRIBED) VALUES (?, ?, ?, ?, ?, ?)";
++        try (Connection conn = DBConnection.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
++            stmt.setString(1, user.getUserName());
++            stmt.setString(2, user.getPassword());
++            stmt.setString(3, user.getUserType().toString());
++            stmt.setString(4, user.getPhoneNumber());
++            stmt.setString(5, user.getEmail());
++            stmt.setBoolean(6, user.isSubscribed());
++            int affectedRows = stmt.executeUpdate();
++            System.out.println("Affected rows: " + affectedRows);
++        } catch (SQLException e) {
++            e.printStackTrace();
++        }
+     }
+-}
+-
+ 
+     @Override
+-    public void updateUser(User user) { }
++    public void updateUser(User user) {
++    }
++
+     @Override
+-    public void deleteUser(int userId) { }
++    public void deleteUser(int userId) {
++    }
++
+     @Override
+-    public User getUserById(int userId) { return null;  }
+-    
++    public User getUserById(int userId) {
++        return null;
++    }
++
+     @Override
+     public User getUserByUsername(String username) {
+         String sql = "SELECT * FROM USERS WHERE USER_NAME = ?";
+-        try (Connection conn = DBConnection.getConnection();
+-             PreparedStatement stmt = conn.prepareStatement(sql)) {
++        try (Connection conn = DBConnection.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
+             stmt.setString(1, username);
+             try (ResultSet rs = stmt.executeQuery()) {
+                 if (rs.next()) {
+@@ -61,12 +64,11 @@ public class UserDaoImpl implements UserDao {
+         }
+         return null;
+     }
+-    
++
+     @Override
+-     public void updateUserIsSubscribed(int userId, boolean isSubscribed) {
++    public void updateUserIsSubscribed(int userId, boolean isSubscribed) {
+         String sql = "UPDATE users SET is_subscribed = ? WHERE id = ?";
+-        try (Connection conn = DBConnection.getConnection();
+-             PreparedStatement stmt = conn.prepareStatement(sql)) {
++        try (Connection conn = DBConnection.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
+             stmt.setBoolean(1, isSubscribed);
+             stmt.setInt(2, userId);
+             stmt.executeUpdate();
+@@ -74,17 +76,34 @@ public class UserDaoImpl implements UserDao {
+             e.printStackTrace();
+         }
+     }
+-     
+-    
++
+     @Override
+-    public List<User> getAllUsers() { return new ArrayList<>();  }
+-    
++    public List<User> getAllUsers() {
++        List<User> users = new ArrayList<>();
++        String sql = "SELECT * FROM USERS ORDER BY ID";
++        try (Connection conn = DBConnection.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql); ResultSet rs = stmt.executeQuery()) {
++            while (rs.next()) {
++                User user = new User();
++                user.setId(rs.getInt("ID"));
++                user.setUserName(rs.getString("USER_NAME"));
++                user.setPassword(rs.getString("PASSWORD"));
++                user.setPhoneNumber(rs.getString("PHONE_NUMBER"));
++                user.setEmail(rs.getString("EMAIL"));
++                user.setUserType(UserType.valueOf(rs.getString("USER_TYPE")));
++                user.setIsSubscribed(rs.getBoolean("IS_SUBSCRIBED"));
++                users.add(user);
++            }
++        } catch (SQLException e) {
++            e.printStackTrace();
++        }
++        return users;
++    }
++
+     @Override
+     public List<User> getAllUsersByType(UserType userType) {
+         List<User> users = new ArrayList<>();
+         String sql = "SELECT * FROM users WHERE user_type = ?";
+-        try (Connection conn = DBConnection.getConnection();
+-             PreparedStatement stmt = conn.prepareStatement(sql)) {
++        try (Connection conn = DBConnection.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
+             stmt.setString(1, userType.toString());
+             ResultSet rs = stmt.executeQuery();
+             while (rs.next()) {
+@@ -99,5 +118,4 @@ public class UserDaoImpl implements UserDao {
+         return users;
+     }
+ 
+-    
+ }
+diff --git a/src/java/service/FoodService.java b/src/java/service/FoodService.java
+index 67b5be2..a464a00 100644
+--- a/src/java/service/FoodService.java
++++ b/src/java/service/FoodService.java
+@@ -15,4 +15,6 @@ public interface FoodService {
+     void updateOneFood(Food food);
+ 
+     void deleteOneFood(int foodID);
++    
++    List<Food> getAllFoods();
+ }
+diff --git a/src/java/service/impl/FoodServiceImpl.java b/src/java/service/impl/FoodServiceImpl.java
+index f26ef12..3097b51 100644
+--- a/src/java/service/impl/FoodServiceImpl.java
++++ b/src/java/service/impl/FoodServiceImpl.java
+@@ -14,7 +14,7 @@ public class FoodServiceImpl implements FoodService {
+     public FoodServiceImpl() {
+         foodDao = new FoodDaoImpl();
+     }
+-    
++
+     public FoodServiceImpl(FoodDao foodDao) {
+         this.foodDao = foodDao;
+     }
+@@ -43,6 +43,10 @@ public class FoodServiceImpl implements FoodService {
+     public void deleteOneFood(int foodID) {
+         foodDao.deleteFood(foodID);
+     }
+-    
+-    
++
++    @Override
++    public List<Food> getAllFoods() {
++        return foodDao.getAllFoods();
++    }
++
+ }
+diff --git a/web/admin.jsp b/web/admin.jsp
+new file mode 100644
+index 0000000..e565631
+--- /dev/null
++++ b/web/admin.jsp
+@@ -0,0 +1,22 @@
++<%@page contentType="text/html" pageEncoding="UTF-8"%>
++<!DOCTYPE html>
++<html>
++    <head>
++        <title>Login</title>
++    </head>
++    <body>
++        <h2>&#129386; FoodSaver &#129386;</h2><br>
++        <h2>Admin Login</h2>
++        
++        <% if (request.getAttribute("errorMessage") != null) { %>
++            <p style="color:red;"><%= request.getAttribute("errorMessage") %></p>
++        <% } %>
++        
++        <form action="login.admindo" method="post">
++            Username: <input type="text" name="username" required><br><br>
++            Password: <input type="password" name="password" required><br><br>
++            
++            <input type="submit" value="Login">
++        </form>
++    </body>
++</html>
+diff --git a/web/views/admin/admin_dashboard.jsp b/web/views/admin/admin_dashboard.jsp
+new file mode 100644
+index 0000000..bd225d9
+--- /dev/null
++++ b/web/views/admin/admin_dashboard.jsp
+@@ -0,0 +1,16 @@
++<%@page contentType="text/html" pageEncoding="UTF-8"%>
++<!DOCTYPE html>
++<html>
++    <head>
++        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
++        <title>Admin Portal</title>
++    </head>
++    <body>
++        <h2>&#129386; FoodSaver &#129386;</h2><br>
++        <h2 style="color:darkblue;"><i>Admin Dashboard</i></h2>
++        <div><a href="getUsers.admindo">Users</a></div>
++        <div><a href="getFoods.admindo">Foods</a></div>
++        <div><a href="getSurplusFoods.admindo">SurplusFoods</a></div>
++        <div><a href="getSubscriptions.admindo">Subscriptions</a></div>
++    </body>
++</html>
+diff --git a/web/views/admin/foods.jsp b/web/views/admin/foods.jsp
+new file mode 100644
+index 0000000..61a0bd8
+--- /dev/null
++++ b/web/views/admin/foods.jsp
+@@ -0,0 +1,53 @@
++<%@page import="java.util.List" %>
++<%@page import="entity.Food" %>
++<%@page import="java.util.Date"%>
++<%@page contentType="text/html" pageEncoding="UTF-8"%>
++<!DOCTYPE html>
++<html>
++    <head>
++        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
++        <title>Food Inventory List</title>
++    </head>
++    <body>
++        <h2>Food Inventory List</h2>
++
++        <table border="1">
++            <thead>
++                    <tr>
++                        <th>ID</th>
++                        <th>Name</th>
++                        <th>quantity</th>
++                        <th>price</th>
++                        <th>Food type</th>
++                        <th>Expiration</th>
++                        <th>OWNER</th>
++                    </tr>
++                </thead>
++            <tbody>
++                <% List<Food> foods = (List<Food>) request.getAttribute("foods");
++                for (Food food : foods) {%>
++                <tr>
++                    <td><%= food.getId()%></td>
++                        <td><%= food.getName()%></td>
++                        <td><%= food.getQuantity()%></td>
++                        <td><%= food.getPrice()%></td>
++                        <td><%= food.getFoodType().toString()%></td>
++                        <%
++                            if (food.getExpirationDate().getTime() < (new Date().getTime() + 7 * 24 * 60 * 60 * 1000)) {
++                        %>
++                        <td bgcolor="#DC143C"><%= food.getExpirationDate()%></td>
++                        <%
++                        } else {
++                        %>
++                        <td><%= food.getExpirationDate()%></td>
++                        <%
++                            }
++                        %>
++                        <td><%= food.getUserID()%></td>
++                </tr>
++                <% }%>
++            </tbody>
++        </table>
++    <p>Back to &#128073; <a href="${pageContext.request.contextPath}/views/admin/admin_dashboard.jsp">DashBoard</a></p>
++    </body>
++</html>
+\ No newline at end of file
+diff --git a/web/views/admin/subscriptions.jsp b/web/views/admin/subscriptions.jsp
+new file mode 100644
+index 0000000..5de054a
+--- /dev/null
++++ b/web/views/admin/subscriptions.jsp
+@@ -0,0 +1,11 @@
++<%@page contentType="text/html" pageEncoding="UTF-8"%>
++<!DOCTYPE html>
++<html>
++    <head>
++        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
++        <title>JSP Page</title>
++    </head>
++    <body>
++        <h1>Hello World!</h1>
++    </body>
++</html>
+diff --git a/web/views/admin/surplusfoods.jsp b/web/views/admin/surplusfoods.jsp
+new file mode 100644
+index 0000000..2872287
+--- /dev/null
++++ b/web/views/admin/surplusfoods.jsp
+@@ -0,0 +1,55 @@
++<%@page import="entity.SurplusFood" %>
++<%@page import="java.util.List" %>
++<%@page contentType="text/html" pageEncoding="UTF-8"%>
++<!DOCTYPE html>
++<html>
++    <head>
++        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
++        <title>Surplusfood Inventory List</title>
++    </head>
++    <body>
++        <h2>Surplusfood Inventory List</h2>
++
++        <table border="1">
++            <thead>
++                <tr>
++                    <th>ID</th>
++                    <th>Name</th>
++                    <th>quantity</th>
++                    <th>price</th>
++                    <th>Food type</th>
++                    <th>Expiration</th>
++                    <th>Discount_rate</th>
++                    <th>Donation</th>
++                </tr>
++            </thead>
++            <tbody>
++                <% List<SurplusFood> surplusfoods = (List<SurplusFood>) request.getAttribute("surplusfoods");
++                    for (SurplusFood surplusfood : surplusfoods) {%>
++                <tr>
++                    <td><%= surplusfood.getId()%></td>
++                    <td><%= surplusfood.getName()%></td>
++                    <td><%= surplusfood.getQuantity()%></td>
++                    <td><%= surplusfood.getPrice()%></td>
++                    <td><%= surplusfood.getFoodType().toString()%></td>
++                    <td><%= surplusfood.getExpirationDate()%></td>
++                    <td><%= surplusfood.getDiscountRate()%></td>
++                    <td>
++                        <input
++                            type="checkbox"
++                            id="donation"
++                            name="donation" 
++                            onclick="return false;"
++                            <% if (surplusfood.isIsForDonation()) {
++                            %>
++                            checked
++                            <% }%>
++                            />
++                    </td>
++                </tr>
++                <% }%>
++            </tbody>
++        </table>
++        <p>Back to &#128073; <a href="${pageContext.request.contextPath}/views/admin/admin_dashboard.jsp">DashBoard</a></p>
++    </body>
++</html>
+diff --git a/web/views/admin/users.jsp b/web/views/admin/users.jsp
+new file mode 100644
+index 0000000..1e08dce
+--- /dev/null
++++ b/web/views/admin/users.jsp
+@@ -0,0 +1,42 @@
++<%@page import="entity.User"%>
++<%@page import="java.util.List" %>
++<%@page contentType="text/html" pageEncoding="UTF-8"%>
++<!DOCTYPE html>
++<html>
++    <head>
++        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
++        <title>User List</title>
++    </head>
++    <body>
++        <h2>User List</h2>
++
++        <table border="1">
++            <thead>
++                <tr>
++                    <th>ID</th>
++                    <th>Username</th>
++                    <th>Password</th>
++                    <th>User Type</th>
++                    <th>Phone</th>
++                    <th>Email</th>
++                    <th>Is subscribed</th>
++                </tr>
++            </thead>
++            <tbody>
++                <% List<User> users = (List<User>) request.getAttribute("users");
++                for (User user : users) {%>
++                <tr>
++                    <td><%= user.getId()%></td>
++                    <td><%= user.getUserName()%></td>
++                    <td><%= user.getPassword()%></td>
++                    <td><%= user.getUserType().toString()%></td>
++                    <td><%= user.getPhoneNumber()%></td>
++                    <td><%= user.getEmail()%></td>
++                    <td><%= user.isSubscribed()%></td>
++                </tr>
++                <% }%>
++            </tbody>
++        </table>
++    <p>Back to &#128073; <a href="${pageContext.request.contextPath}/views/admin/admin_dashboard.jsp">DashBoard</a></p>
++    </body>
++</html>
